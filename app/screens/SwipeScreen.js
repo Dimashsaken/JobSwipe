@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, SafeAreaView, ActivityIndicator } from 'react-native';
-import { Button, Appbar } from 'react-native-paper';
+import { Button, Appbar, Snackbar } from 'react-native-paper';
 import SwipeCard from '../components/cards/SwipeCard';
 import { apiService } from '../utils/apiService';
 import Animated, { 
@@ -15,6 +15,8 @@ const SwipeScreen = ({ navigation }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isUsingBackup, setIsUsingBackup] = useState(false);
+  const [snackbarVisible, setSnackbarVisible] = useState(false);
   const swipeAnim = useSharedValue(0);
 
   // Fetch jobs when component mounts
@@ -26,12 +28,28 @@ const SwipeScreen = ({ navigation }) => {
     try {
       setLoading(true);
       setError(null);
+      setIsUsingBackup(false);
+      
       const fetchedJobs = await apiService.getJobs();
       setJobs(fetchedJobs);
       setCurrentIndex(0);
+      
+      // Check if we're using backup data by trying to make a simple API request
+      try {
+        await fetch(`http://localhost:3000/api/health-check`, { 
+          method: 'GET',
+          timeout: 2000 
+        });
+      } catch (e) {
+        // If fetch fails, we're using backup data
+        setIsUsingBackup(true);
+        setSnackbarVisible(true);
+      }
     } catch (err) {
       console.error('Error fetching jobs:', err);
-      setError('Failed to load jobs. Please try again.');
+      setError('Failed to load jobs. Using backup data.');
+      setIsUsingBackup(true);
+      setSnackbarVisible(true);
     } finally {
       setLoading(false);
     }
@@ -91,6 +109,8 @@ const SwipeScreen = ({ navigation }) => {
     };
   });
 
+  const onDismissSnackbar = () => setSnackbarVisible(false);
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -105,7 +125,7 @@ const SwipeScreen = ({ navigation }) => {
     );
   }
 
-  if (error) {
+  if (error && jobs.length === 0) {
     return (
       <SafeAreaView style={styles.container}>
         <Appbar.Header>
@@ -129,6 +149,13 @@ const SwipeScreen = ({ navigation }) => {
     <SafeAreaView style={styles.container}>
       <Appbar.Header>
         <Appbar.Content title="JobSwipe" />
+        {isUsingBackup && (
+          <Appbar.Action 
+            icon="database" 
+            color="#FF9800"
+            onPress={() => setSnackbarVisible(true)}
+          />
+        )}
       </Appbar.Header>
       
       <View style={styles.cardContainer}>
@@ -186,6 +213,18 @@ const SwipeScreen = ({ navigation }) => {
           Apply
         </Button>
       </View>
+      
+      <Snackbar
+        visible={snackbarVisible}
+        onDismiss={onDismissSnackbar}
+        duration={5000}
+        action={{
+          label: 'Close',
+          onPress: onDismissSnackbar,
+        }}
+      >
+        Using demo data - API server not connected
+      </Snackbar>
     </SafeAreaView>
   );
 };

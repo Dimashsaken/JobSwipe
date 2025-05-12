@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, FlatList, ActivityIndicator, RefreshControl } from 'react-native';
-import { Appbar, Card, Button, Chip, List, Divider } from 'react-native-paper';
+import { Appbar, Card, Button, Chip, List, Divider, Snackbar } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { apiService } from '../utils/apiService';
 
@@ -9,6 +9,8 @@ const ApplicationsScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const [isUsingBackup, setIsUsingBackup] = useState(false);
+  const [snackbarVisible, setSnackbarVisible] = useState(false);
 
   // Fetch applications when component mounts
   useEffect(() => {
@@ -19,11 +21,29 @@ const ApplicationsScreen = ({ navigation }) => {
     try {
       setLoading(true);
       setError(null);
+      setIsUsingBackup(false);
+      
       const data = await apiService.getApplications();
       setApplications(data);
+
+      // Check if we're using backup data by trying to make a simple API request
+      try {
+        await fetch(`http://localhost:3000/api/health-check`, { 
+          method: 'GET',
+          timeout: 2000 
+        });
+      } catch (e) {
+        // If fetch fails, we're using backup data
+        setIsUsingBackup(true);
+        setSnackbarVisible(true);
+      }
     } catch (err) {
       console.error('Error fetching applications:', err);
-      setError('Failed to load applications. Please try again.');
+      setError('Failed to load applications. Using backup data.');
+      setIsUsingBackup(true);
+      if (applications.length === 0) {
+        setSnackbarVisible(true);
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -118,6 +138,8 @@ const ApplicationsScreen = ({ navigation }) => {
     </Card>
   );
 
+  const onDismissSnackbar = () => setSnackbarVisible(false);
+
   if (loading && !refreshing) {
     return (
       <View style={styles.container}>
@@ -136,6 +158,13 @@ const ApplicationsScreen = ({ navigation }) => {
     <View style={styles.container}>
       <Appbar.Header>
         <Appbar.Content title="My Applications" />
+        {isUsingBackup && (
+          <Appbar.Action 
+            icon="database" 
+            color="#FF9800"
+            onPress={() => setSnackbarVisible(true)}
+          />
+        )}
       </Appbar.Header>
 
       {applications.length > 0 ? (
@@ -166,6 +195,18 @@ const ApplicationsScreen = ({ navigation }) => {
       ) : (
         renderEmptyState()
       )}
+
+      <Snackbar
+        visible={snackbarVisible}
+        onDismiss={onDismissSnackbar}
+        duration={5000}
+        action={{
+          label: 'Close',
+          onPress: onDismissSnackbar,
+        }}
+      >
+        Using demo data - API server not connected
+      </Snackbar>
     </View>
   );
 };

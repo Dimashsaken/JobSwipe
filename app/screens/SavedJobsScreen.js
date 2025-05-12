@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, FlatList, ActivityIndicator, RefreshControl } from 'react-native';
-import { Appbar, Card, Button, Title, Paragraph } from 'react-native-paper';
+import { Appbar, Card, Button, Title, Paragraph, Snackbar } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { apiService } from '../utils/apiService';
 
@@ -9,6 +9,8 @@ const SavedJobsScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const [isUsingBackup, setIsUsingBackup] = useState(false);
+  const [snackbarVisible, setSnackbarVisible] = useState(false);
 
   // Fetch saved jobs when component mounts
   useEffect(() => {
@@ -19,11 +21,29 @@ const SavedJobsScreen = ({ navigation }) => {
     try {
       setLoading(true);
       setError(null);
+      setIsUsingBackup(false);
+      
       const data = await apiService.getSavedJobs();
       setSavedJobs(data);
+      
+      // Check if we're using backup data by trying to make a simple API request
+      try {
+        await fetch(`http://localhost:3000/api/health-check`, { 
+          method: 'GET',
+          timeout: 2000 
+        });
+      } catch (e) {
+        // If fetch fails, we're using backup data
+        setIsUsingBackup(true);
+        setSnackbarVisible(true);
+      }
     } catch (err) {
       console.error('Error fetching saved jobs:', err);
-      setError('Failed to load saved jobs. Please try again.');
+      setError('Failed to load saved jobs. Using backup data.');
+      setIsUsingBackup(true);
+      if (savedJobs.length === 0) {
+        setSnackbarVisible(true);
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -114,6 +134,8 @@ const SavedJobsScreen = ({ navigation }) => {
     </Card>
   );
 
+  const onDismissSnackbar = () => setSnackbarVisible(false);
+
   if (loading && !refreshing) {
     return (
       <View style={styles.container}>
@@ -132,6 +154,13 @@ const SavedJobsScreen = ({ navigation }) => {
     <View style={styles.container}>
       <Appbar.Header>
         <Appbar.Content title="Saved Jobs" />
+        {isUsingBackup && (
+          <Appbar.Action 
+            icon="database" 
+            color="#FF9800"
+            onPress={() => setSnackbarVisible(true)}
+          />
+        )}
       </Appbar.Header>
 
       {savedJobs.length > 0 ? (
@@ -162,6 +191,18 @@ const SavedJobsScreen = ({ navigation }) => {
       ) : (
         renderEmptyState()
       )}
+      
+      <Snackbar
+        visible={snackbarVisible}
+        onDismiss={onDismissSnackbar}
+        duration={5000}
+        action={{
+          label: 'Close',
+          onPress: onDismissSnackbar,
+        }}
+      >
+        Using demo data - API server not connected
+      </Snackbar>
     </View>
   );
 };

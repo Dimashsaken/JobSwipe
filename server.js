@@ -14,6 +14,11 @@ const jobs = require('./app/utils/mockData').MOCK_JOBS;
 const savedJobs = [];
 const applications = [];
 
+// Health check endpoint
+app.get('/api/health-check', (req, res) => {
+  res.json({ status: 'ok', message: 'API server is running' });
+});
+
 // Routes
 app.get('/api/jobs', (req, res) => {
   res.json(jobs);
