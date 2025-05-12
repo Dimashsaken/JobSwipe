@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View, Text, Image, TouchableOpacity, Dimensions } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, Dimensions } from 'react-native';
 import { Card, Title, Paragraph, IconButton } from 'react-native-paper';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { 
@@ -70,13 +70,9 @@ const SwipeCard = ({ job, onSwipeLeft, onSwipeRight, onPress }) => {
                 {job.description}
               </Paragraph>
             </Card.Content>
-            <View style={styles.actionHints}>
-              <View style={[styles.actionHint, styles.leftAction]}>
-                <Text style={styles.actionText}>PASS</Text>
-              </View>
-              <View style={[styles.actionHint, styles.rightAction]}>
-                <Text style={styles.actionText}>APPLY</Text>
-              </View>
+            <View style={styles.cardFooter}>
+              <Text style={styles.footerText}>Swipe left to skip, right to apply</Text>
+              <Text style={styles.tapText}>Tap for details</Text>
             </View>
           </Card>
         </TouchableOpacity>
@@ -125,30 +121,24 @@ const styles = StyleSheet.create({
     marginVertical: 10,
     lineHeight: 20,
   },
-  actionHints: {
-    position: 'absolute',
-    top: 10,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
+  cardFooter: {
+    padding: 12,
+    backgroundColor: '#f8f8f8',
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
+    alignItems: 'center',
   },
-  actionHint: {
-    padding: 8,
-    borderRadius: 5,
-    borderWidth: 2,
-    opacity: 0.8,
+  footerText: {
+    fontSize: 12,
+    color: '#666',
+    fontStyle: 'italic',
   },
-  leftAction: {
-    borderColor: '#FF5C5C',
-  },
-  rightAction: {
-    borderColor: '#56CD56',
-  },
-  actionText: {
+  tapText: {
+    marginTop: 4,
+    fontSize: 12,
+    color: '#6200ee',
     fontWeight: 'bold',
-  },
+  }
 });
 
 export default SwipeCard; 

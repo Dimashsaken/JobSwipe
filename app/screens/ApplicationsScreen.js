@@ -1,11 +1,44 @@
-import React from 'react';
-import { StyleSheet, View, Text, FlatList } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, View, Text, FlatList, ActivityIndicator, RefreshControl } from 'react-native';
 import { Appbar, Card, Button, Chip, List, Divider } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { apiService } from '../utils/apiService';
 
 const ApplicationsScreen = ({ navigation }) => {
-  // In the full version, this would come from state/storage
-  const applications = [];
+  const [applications, setApplications] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Fetch applications when component mounts
+  useEffect(() => {
+    fetchApplications();
+  }, []);
+
+  const fetchApplications = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await apiService.getApplications();
+      setApplications(data);
+    } catch (err) {
+      console.error('Error fetching applications:', err);
+      setError('Failed to load applications. Please try again.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchApplications();
+  };
+
+  const handleViewJob = (jobId) => {
+    // Navigate to job details with the job ID
+    navigation.navigate('JobDetail', { jobId });
+  };
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -80,16 +113,24 @@ const ApplicationsScreen = ({ navigation }) => {
         />
       </Card.Content>
       <Card.Actions>
-        <Button onPress={() => {}}>View Job</Button>
-        <Button 
-          mode="outlined"
-          onPress={() => {}}
-        >
-          Update Status
-        </Button>
+        <Button onPress={() => handleViewJob(item.jobId)}>View Job</Button>
       </Card.Actions>
     </Card>
   );
+
+  if (loading && !refreshing) {
+    return (
+      <View style={styles.container}>
+        <Appbar.Header>
+          <Appbar.Content title="My Applications" />
+        </Appbar.Header>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#6200ee" />
+          <Text style={styles.loadingText}>Loading applications...</Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -103,7 +144,25 @@ const ApplicationsScreen = ({ navigation }) => {
           renderItem={renderApplicationItem}
           keyExtractor={item => item.id}
           contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={["#6200ee"]}
+            />
+          }
         />
+      ) : error ? (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+          <Button 
+            mode="contained" 
+            onPress={fetchApplications}
+            style={styles.retryButton}
+          >
+            Retry
+          </Button>
+        </View>
       ) : (
         renderEmptyState()
       )}
@@ -172,6 +231,30 @@ const styles = StyleSheet.create({
   browseButton: {
     paddingHorizontal: 20,
     backgroundColor: '#6200ee',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    fontSize: 16,
+    color: 'red',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  retryButton: {
+    marginTop: 10,
   },
 });
 

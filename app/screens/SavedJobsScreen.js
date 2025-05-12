@@ -1,11 +1,63 @@
-import React from 'react';
-import { StyleSheet, View, Text, FlatList } from 'react-native';
-import { Appbar, Card, Button, Title, Paragraph, Avatar } from 'react-native-paper';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, View, Text, FlatList, ActivityIndicator, RefreshControl } from 'react-native';
+import { Appbar, Card, Button, Title, Paragraph } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { apiService } from '../utils/apiService';
 
 const SavedJobsScreen = ({ navigation }) => {
-  // In the full version, this would come from state/storage
-  const savedJobs = [];
+  const [savedJobs, setSavedJobs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Fetch saved jobs when component mounts
+  useEffect(() => {
+    fetchSavedJobs();
+  }, []);
+
+  const fetchSavedJobs = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await apiService.getSavedJobs();
+      setSavedJobs(data);
+    } catch (err) {
+      console.error('Error fetching saved jobs:', err);
+      setError('Failed to load saved jobs. Please try again.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchSavedJobs();
+  };
+
+  const handleViewJob = (job) => {
+    navigation.navigate('JobDetail', { job });
+  };
+
+  const handleUnsaveJob = async (jobId) => {
+    try {
+      await apiService.unsaveJob(jobId);
+      // Remove job from local state
+      setSavedJobs(savedJobs.filter(job => job.id !== jobId));
+    } catch (err) {
+      console.error('Error removing saved job:', err);
+    }
+  };
+
+  const handleApplyJob = async (jobId) => {
+    try {
+      await apiService.applyForJob(jobId);
+      // Show some feedback or navigate to applications
+      navigation.navigate('Applications');
+    } catch (err) {
+      console.error('Error applying for job:', err);
+    }
+  };
 
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
@@ -43,17 +95,38 @@ const SavedJobsScreen = ({ navigation }) => {
         </View>
       </Card.Content>
       <Card.Actions>
-        <Button onPress={() => {}}>View</Button>
+        <Button onPress={() => handleViewJob(item)}>View</Button>
+        <Button 
+          icon="briefcase" 
+          mode="outlined" 
+          onPress={() => handleApplyJob(item.id)}
+        >
+          Apply
+        </Button>
         <Button 
           icon="heart" 
           color="#FF5C5C" 
-          onPress={() => {}}
+          onPress={() => handleUnsaveJob(item.id)}
         >
           Unsave
         </Button>
       </Card.Actions>
     </Card>
   );
+
+  if (loading && !refreshing) {
+    return (
+      <View style={styles.container}>
+        <Appbar.Header>
+          <Appbar.Content title="Saved Jobs" />
+        </Appbar.Header>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#6200ee" />
+          <Text style={styles.loadingText}>Loading saved jobs...</Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -67,7 +140,25 @@ const SavedJobsScreen = ({ navigation }) => {
           renderItem={renderJobItem}
           keyExtractor={item => item.id}
           contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={["#6200ee"]}
+            />
+          }
         />
+      ) : error ? (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+          <Button 
+            mode="contained" 
+            onPress={fetchSavedJobs}
+            style={styles.retryButton}
+          >
+            Retry
+          </Button>
+        </View>
       ) : (
         renderEmptyState()
       )}
@@ -123,6 +214,30 @@ const styles = StyleSheet.create({
   browseButton: {
     paddingHorizontal: 20,
     backgroundColor: '#6200ee',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    fontSize: 16,
+    color: 'red',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  retryButton: {
+    marginTop: 10,
   },
 });
 

@@ -1,8 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { StyleSheet, View, Text, SafeAreaView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, View, Text, SafeAreaView, ActivityIndicator } from 'react-native';
 import { Button, Appbar } from 'react-native-paper';
 import SwipeCard from '../components/cards/SwipeCard';
-import { MOCK_JOBS } from '../utils/mockData';
+import { apiService } from '../utils/apiService';
 import Animated, { 
   useSharedValue,
   withTiming,
@@ -11,13 +11,34 @@ import Animated, {
 } from 'react-native-reanimated';
 
 const SwipeScreen = ({ navigation }) => {
-  const [jobs, setJobs] = useState(MOCK_JOBS);
+  const [jobs, setJobs] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const swipeAnim = useSharedValue(0);
 
+  // Fetch jobs when component mounts
+  useEffect(() => {
+    fetchJobs();
+  }, []);
+
+  const fetchJobs = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const fetchedJobs = await apiService.getJobs();
+      setJobs(fetchedJobs);
+      setCurrentIndex(0);
+    } catch (err) {
+      console.error('Error fetching jobs:', err);
+      setError('Failed to load jobs. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSwipeLeft = (job) => {
-    console.log('Passed on job:', job.title);
-    // Animation and delay to allow the card to finish animating off screen
+    // Simply pass on this job
     swipeAnim.value = withTiming(1, { duration: 300 });
     setTimeout(() => {
       setCurrentIndex(prev => prev + 1);
@@ -25,15 +46,20 @@ const SwipeScreen = ({ navigation }) => {
     }, 300);
   };
 
-  const handleSwipeRight = (job) => {
-    console.log('Applied to job:', job.title);
-    // Here we would handle job application logic
-    // For now just advancing to the next card with animation
-    swipeAnim.value = withTiming(1, { duration: 300 });
-    setTimeout(() => {
+  const handleSwipeRight = async (job) => {
+    // Apply for this job using the API
+    try {
+      await apiService.applyForJob(job.id);
+      swipeAnim.value = withTiming(1, { duration: 300 });
+      setTimeout(() => {
+        setCurrentIndex(prev => prev + 1);
+        swipeAnim.value = 0;
+      }, 300);
+    } catch (err) {
+      console.error('Error applying for job:', err);
+      // Continue to next job even if application fails
       setCurrentIndex(prev => prev + 1);
-      swipeAnim.value = 0;
-    }, 300);
+    }
   };
 
   const handleCardPress = (job) => {
@@ -41,7 +67,6 @@ const SwipeScreen = ({ navigation }) => {
     navigation.navigate('JobDetail', { job });
   };
 
-  // For manually swiping left/right using buttons (alternative to gesture)
   const handleButtonSwipeLeft = () => {
     if (currentIndex < jobs.length) {
       handleSwipeLeft(jobs[currentIndex]);
@@ -66,11 +91,44 @@ const SwipeScreen = ({ navigation }) => {
     };
   });
 
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Appbar.Header>
+          <Appbar.Content title="JobSwipe" />
+        </Appbar.Header>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#6200ee" />
+          <Text style={styles.loadingText}>Loading jobs...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Appbar.Header>
+          <Appbar.Content title="JobSwipe" />
+        </Appbar.Header>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+          <Button 
+            mode="contained" 
+            onPress={fetchJobs}
+            style={styles.retryButton}
+          >
+            Retry
+          </Button>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <Appbar.Header>
         <Appbar.Content title="JobSwipe" />
-        <Appbar.Action icon="filter-variant" onPress={() => {}} />
       </Appbar.Header>
       
       <View style={styles.cardContainer}>
@@ -80,9 +138,9 @@ const SwipeScreen = ({ navigation }) => {
           <Button 
             mode="contained" 
             style={styles.refreshButton}
-            onPress={() => setCurrentIndex(0)}
+            onPress={fetchJobs}
           >
-            Start Over
+            Refresh Jobs
           </Button>
         </Animated.View>
 
@@ -116,10 +174,10 @@ const SwipeScreen = ({ navigation }) => {
           style={[styles.button, styles.rejectButton]}
           disabled={currentIndex >= jobs.length}
         >
-          Pass
+          Skip
         </Button>
         <Button
-          icon="thumb-up"
+          icon="briefcase"
           mode="contained"
           onPress={handleButtonSwipeRight}
           style={[styles.button, styles.applyButton]}
@@ -168,6 +226,30 @@ const styles = StyleSheet.create({
   },
   refreshButton: {
     marginTop: 20,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    fontSize: 16,
+    color: 'red',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  retryButton: {
+    marginTop: 10,
   },
 });
 
